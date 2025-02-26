@@ -15,7 +15,7 @@ const renderer = new THREE.WebGLRenderer();
 const pointerLockControls = new PointerLockControls(camera, document.body);
 
 // state variables
-const movingStates = {
+const state = {
   forward: false,
   backward: false,
   left: false,
@@ -29,8 +29,8 @@ function setup() {
   document.body.appendChild(renderer.domElement);
 
   document.body.addEventListener("click", (e) => pointerLockControls.lock());
-  document.body.addEventListener("keydown", (e) => onKeyDown(e, movingStates));
-  document.body.addEventListener("keyup", (e) => onKeyUp(e, movingStates));
+  document.body.addEventListener("keydown", (e) => onKeyDown(e, state));
+  document.body.addEventListener("keyup", (e) => onKeyUp(e, state));
 
   const plane = new THREE.Mesh(
     new THREE.PlaneGeometry(5, 5),
@@ -49,7 +49,7 @@ function setup() {
 
 // define the animation loop function which will run ones per frame (typically 60fps)
 function animate() {
-  const cameraDir = updateCameraPosition(camera, movingStates);
+  const cameraDir = updateCameraPosition(camera, state);
 
   renderer.render(scene, camera);
 }

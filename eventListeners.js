@@ -1,33 +1,33 @@
-export function onKeyDown(event, movingStates) {
+export function onKeyDown(event, state) {
   switch (event.key) {
     case "w":
-      movingStates.forward = true;
+      state.forward = true;
       break;
     case "s":
-      movingStates.backward = true;
+      state.backward = true;
       break;
     case "a":
-      movingStates.left = true;
+      state.left = true;
       break;
     case "d":
-      movingStates.right = true;
+      state.right = true;
       break;
   }
 }
 
-export function onKeyUp(event, movingStates) {
+export function onKeyUp(event, state) {
   switch (event.key) {
     case "w":
-      movingStates.forward = false;
+      state.forward = false;
       break;
     case "s":
-      movingStates.backward = false;
+      state.backward = false;
       break;
     case "a":
-      movingStates.left = false;
+      state.left = false;
       break;
     case "d":
-      movingStates.right = false;
+      state.right = false;
       break;
   }
 }

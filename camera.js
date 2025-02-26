@@ -3,7 +3,7 @@ import * as THREE from "three";
 // constants
 const SPEED = 0.05;
 
-export function updateCameraPosition(camera, movingStates) {
+export function updateCameraPosition(camera, state) {
   const cameraDir = new THREE.Vector3();
   camera.getWorldDirection(cameraDir);
   cameraDir.normalize();
@@ -14,16 +14,16 @@ export function updateCameraPosition(camera, movingStates) {
   const cameraDirLeft = new THREE.Vector3();
   cameraDirLeft.crossVectors(camera.up, cameraDir);
 
-  if (movingStates.forward) {
+  if (state.forward) {
     camera.position.addScaledVector(cameraDirWithoutY, SPEED);
   }
-  if (movingStates.backward) {
+  if (state.backward) {
     camera.position.addScaledVector(cameraDirWithoutY, -SPEED);
   }
-  if (movingStates.left) {
+  if (state.left) {
     camera.position.addScaledVector(cameraDirLeft, SPEED);
   }
-  if (movingStates.right) {
+  if (state.right) {
     camera.position.addScaledVector(cameraDirLeft, -SPEED);
   }
 
