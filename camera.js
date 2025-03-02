@@ -4,9 +4,10 @@ import * as THREE from "three";
 const SPEED = 0.05;
 
 export function updateCameraPosition(camera, state) {
-  const cameraDir = new THREE.Vector3();
-  camera.getWorldDirection(cameraDir);
-  cameraDir.normalize();
+  const cameraDir = camera
+    .getWorldDirection(new THREE.Vector3())
+    .clone()
+    .normalize();
 
   const cameraDirWithoutY = cameraDir.clone();
   cameraDirWithoutY.y = 0;
@@ -14,16 +15,16 @@ export function updateCameraPosition(camera, state) {
   const cameraDirLeft = new THREE.Vector3();
   cameraDirLeft.crossVectors(camera.up, cameraDir);
 
-  if (state.forward) {
+  if (state.keyboard.forward) {
     camera.position.addScaledVector(cameraDirWithoutY, SPEED);
   }
-  if (state.backward) {
+  if (state.keyboard.backward) {
     camera.position.addScaledVector(cameraDirWithoutY, -SPEED);
   }
-  if (state.left) {
+  if (state.keyboard.left) {
     camera.position.addScaledVector(cameraDirLeft, SPEED);
   }
-  if (state.right) {
+  if (state.keyboard.right) {
     camera.position.addScaledVector(cameraDirLeft, -SPEED);
   }
 

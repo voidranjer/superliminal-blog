@@ -1,16 +1,16 @@
 export function onKeyDown(event, state) {
   switch (event.key) {
     case "w":
-      state.forward = true;
+      state.keyboard.forward = true;
       break;
     case "s":
-      state.backward = true;
+      state.keyboard.backward = true;
       break;
     case "a":
-      state.left = true;
+      state.keyboard.left = true;
       break;
     case "d":
-      state.right = true;
+      state.keyboard.right = true;
       break;
   }
 }
@@ -18,16 +18,24 @@ export function onKeyDown(event, state) {
 export function onKeyUp(event, state) {
   switch (event.key) {
     case "w":
-      state.forward = false;
+      state.keyboard.forward = false;
       break;
     case "s":
-      state.backward = false;
+      state.keyboard.backward = false;
       break;
     case "a":
-      state.left = false;
+      state.keyboard.left = false;
       break;
     case "d":
-      state.right = false;
+      state.keyboard.right = false;
       break;
   }
+}
+
+export function onMouseDown(event, state) {
+  state.mouse.isMouseDown = true;
+}
+
+export function onMouseUp(event, state) {
+  state.mouse.isMouseDown = false;
 }
