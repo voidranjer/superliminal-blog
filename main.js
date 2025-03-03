@@ -19,8 +19,8 @@ const plane = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: 0xffff00, side: THREE.DoubleSide })
 );
 const box = new THREE.Mesh(
-  // new THREE.BoxGeometry(1, 1, 1),
-  new THREE.SphereGeometry(1),
+  new THREE.BoxGeometry(1, 1, 1),
+  // new THREE.SphereGeometry(1),
   new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true })
 );
 const pivotPointBox = new THREE.Mesh(
@@ -44,13 +44,17 @@ const state = {
     isMouseDown: false,
     prevIsMouseDown: false,
   },
-  transform: {
-    initialScale: 1,
-    initialDist: undefined,
-  },
 };
+
+// rotation
 let initialCameraQuat;
 let initialObjectQuat;
+
+// scale
+let initialScale = 1;
+let initialDist = 1;
+let shouldPullBack = false;
+let cameraPoint = null;
 
 // setup function: we call this function only once at the beginning of the program to setup the scene
 function setup() {
@@ -64,16 +68,12 @@ function setup() {
   document.body.addEventListener("mousedown", (e) => onMouseDown(e, state));
   document.body.addEventListener("mouseup", (e) => onMouseUp(e, state));
 
-  const sphere = new THREE.Mesh(
-    new THREE.BoxGeometry(1, 1, 1),
-    // new THREE.SphereGeometry(1),
-    new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true })
-  );
-
   scene.add(plane);
   scene.add(pivotParent);
   // scene.add(pivotPointBox);
   pivotParent.add(box);
+
+  plane.geometry.computeBoundingBox();
 
   camera.position.z = 5; // move camera backwards so we can see the objects
 }
@@ -84,10 +84,11 @@ function animate() {
   const cameraPos = camera.getWorldPosition(new THREE.Vector3()).clone();
 
   raycaster.setFromCamera({ x: 0, y: 0 }, camera);
-  let intersects = raycaster.intersectObjects(pivotParent.children);
+  let intersects = raycaster.intersectObject(box);
 
   if (state.mouse.isMouseDown && intersects.length > 0) {
     const closestObj = intersects[0].object;
+    const oneAwayFromCamera = cameraPos.clone().addScaledVector(cameraDir, 1);
 
     if (!state.mouse.prevIsMouseDown) {
       scene.attach(closestObj);
@@ -97,22 +98,19 @@ function animate() {
       initialCameraQuat = camera.quaternion.clone();
       initialObjectQuat = pivotParent.quaternion.clone();
 
-      const initialScale = pivotParent.scale.x; // or y or z
-      const initialDist = cameraPos.distanceTo(pivotParent.position);
-      const newPos = cameraPos.clone().addScaledVector(cameraDir, 0.1);
+      initialScale = pivotParent.scale.x; // or y or z
+      initialDist = cameraPos.distanceTo(pivotParent.position);
 
-      pivotParent.position.copy(newPos);
-      const newDist = cameraPos.distanceTo(newPos);
+      pivotParent.position.copy(oneAwayFromCamera);
+      const newDist = cameraPos.distanceTo(oneAwayFromCamera);
       const scaleFactor = newDist / initialDist;
       const scale = initialScale * scaleFactor;
       pivotParent.scale.set(scale, scale, scale);
     }
 
-    pivotPointBox.position.copy(intersects[0].point);
+    // pivotPointBox.position.copy(intersects[0].point);
 
-    const newPos = cameraPos.clone().addScaledVector(cameraDir, 0.1);
-
-    pivotParent.position.copy(newPos);
+    pivotParent.position.copy(oneAwayFromCamera);
 
     const q_diff = camera.quaternion
       .clone()
@@ -120,144 +118,51 @@ function animate() {
     pivotParent.quaternion.copy(q_diff.multiply(initialObjectQuat));
   }
 
-  const intersectsBox = raycaster.intersectObject(box);
+  raycaster.setFromCamera({ x: 0, y: 0 }, camera);
+  let intersectsBox = raycaster.intersectObject(box);
+  let intersectsPlane = raycaster.intersectObject(plane);
   if (
     !state.mouse.isMouseDown &&
     state.mouse.prevIsMouseDown &&
-    intersectsBox.length > 0
+    intersectsBox.length == 1 &&
+    intersectsPlane.length == 1
   ) {
-    const NUM_RAYS = 1000; // Adjust for more coverage
-    box.geometry.computeBoundingBox();
-    const boundingBox = box.geometry.boundingBox.clone();
-    boundingBox.applyMatrix4(box.matrixWorld);
+    intersectsBox = intersectsBox[0];
+    intersectsPlane = intersectsPlane[0];
 
-    // draw bounding box
-    // const boxVis = new THREE.Box3Helper(boundingBox, 0xffff00);
-    // scene.add(boxVis);
+    // move the box to the plane (without re-scale)
+    scene.attach(box);
+    pivotParent.position.copy(intersectsBox.point);
+    pivotParent.attach(box);
+    pivotParent.position.copy(intersectsPlane.point);
+    cameraPoint = cameraPos.clone();
+    shouldPullBack = true;
+  }
 
-    const pointsOnWall = [];
-    const pointsOnWallWithBacksideIntersects = [];
-    const backsideIntersects = [];
+  if (shouldPullBack) {
+    const MAGNITUDE = 0.1;
+    const pullbackDir = new THREE.Vector3().subVectors(
+      cameraPoint,
+      pivotParent.position
+    );
+    pivotParent.position.addScaledVector(pullbackDir, MAGNITUDE);
+    const newDist = cameraPoint.distanceTo(pivotParent.position);
+    const scaleFactor = newDist / initialDist;
+    const scale = initialScale * scaleFactor;
+    pivotParent.scale.set(scale, scale, scale);
 
-    for (let i = 0; i < NUM_RAYS; i++) {
-      // generate random point within bounding box
-      const randomPoint = new THREE.Vector3(
-        THREE.MathUtils.lerp(
-          boundingBox.min.x,
-          boundingBox.max.x,
-          Math.random()
-        ),
-        THREE.MathUtils.lerp(
-          boundingBox.min.y,
-          boundingBox.max.y,
-          Math.random()
-        ),
-        THREE.MathUtils.lerp(
-          boundingBox.min.z,
-          boundingBox.max.z,
-          Math.random()
-        )
-      );
+    // Compute Bounding Boxes
+    box.updateWorldMatrix(true);
+    const boxBoundingBox = new THREE.Box3().setFromObject(box); // investigate what 'setFromObject' does
+    const planeBoundingBox = new THREE.Box3().setFromObject(plane);
 
-      // draw line from camera to the random point
-      // const material = new THREE.LineBasicMaterial({ color: 0x0000ff });
-      // const points = [];
-      // points.push(cameraPos);
-      // points.push(randomPoint);
-      // const geometry = new THREE.BufferGeometry().setFromPoints(points);
-      // const line = new THREE.Line(geometry, material);
-      // scene.add(line);
+    // Check for Intersection
+    const isIntersecting = boxBoundingBox.intersectsBox(planeBoundingBox);
 
-      // Compute ray direction from the camera to the random point
-      const direction = new THREE.Vector3()
-        .subVectors(randomPoint, cameraPos)
-        .normalize();
-      raycaster.set(cameraPos, direction);
-
-      // Check for intersections with the background plane
-      const intersects = raycaster.intersectObject(plane);
-      if (intersects.length > 0) {
-        const pointOnBg = intersects[0].point;
-        pointsOnWall.push(pointOnBg);
-
-        // draw each point on the wall (not just the selected one)
-        // const sphereGeom = new THREE.SphereGeometry(0.01);
-        // const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-        // const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-        // sphere.position.copy(pointOnBg);
-        // scene.add(sphere);
-
-        const pointToCamera = new THREE.Vector3()
-          .subVectors(cameraPos, pointOnBg)
-          .normalize();
-        raycaster.set(pointOnBg, pointToCamera);
-
-        const reverseIntersects = raycaster.intersectObject(box);
-        if (reverseIntersects.length > 0) {
-          pointsOnWallWithBacksideIntersects.push(pointOnBg);
-          backsideIntersects.push(reverseIntersects[0].point);
-
-          // draw the line from point on bg to the backside of the geometry
-          // const material = new THREE.LineBasicMaterial({ color: 0xff0000 });
-          // const points = [];
-          // points.push(pointOnBg);
-          // points.push(reverseIntersects[0].point);
-          // const geometry = new THREE.BufferGeometry().setFromPoints(points);
-          // const line = new THREE.Line(geometry, material);
-          // scene.add(line);
-
-          // draw each point (not just the selected one)
-          // const sphereGeom = new THREE.SphereGeometry(0.01);
-          // const sphereMat = new THREE.MeshBasicMaterial({ color: 0x00ff00 });
-          // const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-          // sphere.position.copy(reverseIntersects[0].point);
-          // scene.add(sphere);
-        }
-      }
-    }
-
-    let minDist = Infinity;
-    let indexOfLeastDistToWall = 0;
-
-    for (let i = 0; i < pointsOnWallWithBacksideIntersects.length; i++) {
-      const backsidePoint = backsideIntersects[i];
-      const pointOnWall = pointsOnWallWithBacksideIntersects[i];
-
-      const dist = backsidePoint.distanceTo(pointOnWall);
-      if (dist < minDist) {
-        minDist = dist;
-        indexOfLeastDistToWall = i;
-      }
-    }
-
-    // draw the point
-    // const sphereGeom = new THREE.SphereGeometry(0.01);
-    // const sphereMat = new THREE.MeshBasicMaterial({ color: 0x0000ff });
-    // const sphere = new THREE.Mesh(sphereGeom, sphereMat);
-    // sphere.position.copy(backsideIntersects[indexOfLeastDistToWall]);
-    // scene.add(sphere);
-
-    if (backsideIntersects.length !== 0) {
-      // tp to wall
-      scene.attach(box);
-      pivotParent.position.copy(backsideIntersects[indexOfLeastDistToWall]);
-      pivotParent.attach(box);
-
-      const initialScale = pivotParent.scale.x; // or y or z
-      const initialDist = cameraPos.distanceTo(pivotParent.position);
-
-      const newPos = pointsOnWallWithBacksideIntersects[indexOfLeastDistToWall];
-
-      pivotParent.position.copy(newPos);
-      const newDist = cameraPos.distanceTo(newPos);
-      const scaleFactor = newDist / initialDist;
-      const scale = initialScale * scaleFactor;
-      pivotParent.scale.set(scale, scale, scale);
-    }
+    if (!isIntersecting) shouldPullBack = false;
   }
 
   state.mouse.prevIsMouseDown = state.mouse.isMouseDown;
-
   renderer.render(scene, camera);
 }
 
