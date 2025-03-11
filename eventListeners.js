@@ -1,3 +1,5 @@
+//deleteme
+
 export function onKeyDown(event, state) {
   switch (event.key) {
     case "w":
